@@ -1409,6 +1409,35 @@ def main() -> None:
 
         st.plotly_chart(styled_plotly(fig), use_container_width=True)
 
+    if menu == "👥 Customer Segmentation":
+
+        st.title("👥 Customer Segmentation")
+
+        df = load_customer_data()
+
+        st.subheader("Distribuição de Clientes")
+
+        fig = px.histogram(
+            df,
+            x="avg_order_value",
+            nbins=30,
+            title="Distribuição do Ticket Médio"
+        )
+
+        st.plotly_chart(styled_plotly(fig), use_container_width=True)
+
+        st.subheader("Valor Estimado do Cliente (LTV)")
+
+        fig2 = px.scatter(
+            df,
+            x="frequency_12m",
+            y="ltv_estimate",
+            color="tenure_months",
+            title="Lifetime Value por Frequência"
+        )
+
+        st.plotly_chart(styled_plotly(fig2), use_container_width=True)
+
 
 if __name__ == "__main__":
     main()
