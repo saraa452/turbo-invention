@@ -1284,12 +1284,22 @@ def main() -> None:
         initial_sidebar_state="expanded"
     )
 
-    st.title("📊 Data Analytics Portfolio")
+    apply_ui_style()
 
     menu = st.sidebar.selectbox(
         "Navegação",
-        ["Visão Geral", "Análise de Vendas", "Insights de Negócio", "Sobre o Projeto"],
+        [
+            "🏠 Home",
+            "📊 Sales Analysis",
+            "👥 Customer Segmentation",
+            "📈 Business Dashboard",
+            "⚙️ ETL Pipeline",
+            "📚 Artigos",
+            "👤 Sobre"
+        ]
     )
+
+    st.title("📊 Data Analytics Portfolio")
 
     st.markdown(
         """
