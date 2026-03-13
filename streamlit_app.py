@@ -1357,6 +1357,58 @@ def main() -> None:
         """
         )
 
+    if menu == "📊 Sales Analysis":
+
+        st.title("📊 Sales Performance Analysis")
+
+        df = load_sales_model()
+
+        st.subheader("Visão Geral")
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        col1.metric(
+            "Receita Total",
+            format_currency(df["net_revenue"].sum())
+        )
+
+        col2.metric(
+            "Pedidos",
+            df.shape[0]
+        )
+
+        col3.metric(
+            "Margem Média",
+            format_percent(df["margin_pct"].mean())
+        )
+
+        col4.metric(
+            "Ticket Médio",
+            format_currency(df["net_revenue"].mean())
+        )
+
+        st.divider()
+
+        st.subheader("Receita por Categoria")
+
+        category_sales = (
+            df.groupby("category")["net_revenue"]
+            .sum()
+            .reset_index()
+            .sort_values("net_revenue", ascending=False)
+        )
+
+        fig = px.bar(
+            category_sales,
+            x="category",
+            y="net_revenue",
+            color="category",
+            title="Faturamento por Categoria",
+            color_discrete_sequence=COLORS
+        )
+
+        st.plotly_chart(styled_plotly(fig), use_container_width=True)
+
 
 if __name__ == "__main__":
     main()
