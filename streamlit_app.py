@@ -1299,35 +1299,63 @@ def main() -> None:
         ]
     )
 
-    st.title("📊 Data Analytics Portfolio")
+    if menu == "🏠 Home":
 
-    st.markdown(
+        st.title("📊 Data Analytics Portfolio")
+
+        st.markdown(
         """
-### Projeto: Plataforma de Análise de Vendas
+        Plataforma de demonstração de projetos de **Data Analytics e Business Intelligence**.
 
-Este projeto demonstra um pipeline completo de análise de dados:
+        Este portfólio apresenta projetos práticos envolvendo:
 
-• Extração e tratamento de dados  
-• Análise exploratória  
-• Visualização interativa  
-• Geração de insights de negócio  
+        • Análise de dados de vendas  
+        • Segmentação de clientes  
+        • Dashboards de indicadores de negócio  
+        • Pipeline de engenharia de dados  
 
-### Tecnologias utilizadas
-- Python
-- Pandas
-- SQL
-- Streamlit
-- Plotly
+        ### Tecnologias utilizadas
 
-### Objetivo do projeto
-Analisar dados de vendas para identificar:
+        - Python
+        - Pandas
+        - SQL
+        - Plotly
+        - Streamlit
+        - ETL Pipelines
 
-- Produtos mais vendidos
-- Regiões com maior faturamento
-- Tendências de vendas
-- Oportunidades de crescimento
-"""
-    )
+        ### Objetivo
+
+        Demonstrar aplicações reais de **análise de dados para tomada de decisão empresarial**.
+        """
+        )
+
+        st.divider()
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("Projetos Analíticos", "4")
+        col2.metric("Dashboards Criados", "6+")
+        col3.metric("Pipelines de Dados", "1")
+
+        st.divider()
+
+        st.subheader("Projetos Disponíveis")
+
+        st.markdown(
+        """
+        **Sales Analysis**  
+        Análise de transações de vendas para identificar padrões de receita.
+
+        **Customer Segmentation**  
+        Segmentação de clientes baseada em comportamento de compra.
+
+        **Business Dashboard**  
+        Dashboard executivo com indicadores financeiros.
+
+        **ETL Pipeline**  
+        Pipeline de dados automatizado para processamento analítico.
+        """
+        )
 
 
 if __name__ == "__main__":
