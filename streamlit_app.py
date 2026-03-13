@@ -1506,6 +1506,28 @@ def main() -> None:
 
         render_html_article(ARTICLE_FILES[article])
 
+    if menu in ["👤 Sobre", "Sobre"]:
+
+        st.title("Sobre a Autora")
+
+        st.markdown(
+        """
+        **Sara Oliveira Guimarães Nascimento**
+
+        Analista de Negócios especializada em:
+
+        • Análise de dados  
+        • Business Intelligence  
+        • Processos empresariais  
+        • Estratégia baseada em dados  
+
+        Empresa: **Dalumia Consultoria**
+
+        Este portfólio apresenta projetos desenvolvidos para demonstrar
+        aplicações práticas de dados na tomada de decisão empresarial.
+        """
+        )
+
 
 if __name__ == "__main__":
     main()
