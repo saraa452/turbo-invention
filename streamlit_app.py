@@ -1363,51 +1363,118 @@ def main() -> None:
 
         df = load_sales_model()
 
+        # --- KPIs ---
         st.subheader("Visão Geral")
 
         col1, col2, col3, col4 = st.columns(4)
-
-        col1.metric(
-            "Receita Total",
-            format_currency(df["net_revenue"].sum())
-        )
-
-        col2.metric(
-            "Pedidos",
-            df.shape[0]
-        )
-
-        col3.metric(
-            "Margem Média",
-            format_percent(df["margin_pct"].mean())
-        )
-
-        col4.metric(
-            "Ticket Médio",
-            format_currency(df["net_revenue"].mean())
-        )
+        col1.metric("Receita Total", format_currency(df["net_revenue"].sum()))
+        col2.metric("Pedidos", f"{df.shape[0]:,}")
+        col3.metric("Margem Média", format_percent(df["margin_pct"].mean()))
+        col4.metric("Ticket Médio", format_currency(df["net_revenue"].mean()))
 
         st.divider()
 
-        st.subheader("Receita por Categoria")
+        # --- Receita Mensal (tendência temporal) ---
+        st.subheader("Tendência de Receita Mensal")
+        monthly = df.groupby("month", as_index=False)["net_revenue"].sum()
+        fig_month = px.area(
+            monthly, x="month", y="net_revenue",
+            title="Evolução da Receita por Mês",
+            color_discrete_sequence=[COLOR_PRIMARY],
+        )
+        fig_month.update_traces(fillcolor="rgba(27,79,114,0.15)")
+        st.plotly_chart(styled_plotly(fig_month), use_container_width=True)
 
-        category_sales = (
-            df.groupby("category")["net_revenue"]
+        # --- Receita por Categoria ---
+        col_cat, col_pay = st.columns(2)
+
+        with col_cat:
+            st.subheader("Receita por Categoria")
+            category_sales = (
+                df.groupby("category", as_index=False)["net_revenue"]
+                .sum()
+                .sort_values("net_revenue", ascending=False)
+            )
+            fig_cat = px.bar(
+                category_sales, x="category", y="net_revenue",
+                color="category", title="Faturamento por Categoria",
+                color_discrete_sequence=COLORS,
+            )
+            st.plotly_chart(styled_plotly(fig_cat), use_container_width=True)
+
+        # --- Mix de Pagamento ---
+        with col_pay:
+            st.subheader("Mix de Pagamento")
+            pay_mix = df.groupby("payment_method", as_index=False)["net_revenue"].sum()
+            fig_pay = px.pie(
+                pay_mix, names="payment_method", values="net_revenue",
+                title="Receita por Método de Pagamento",
+                color_discrete_sequence=COLORS, hole=0.45,
+            )
+            fig_pay.update_traces(textinfo="label+percent", textposition="outside")
+            st.plotly_chart(styled_plotly(fig_pay), use_container_width=True)
+
+        # --- Receita por Região ---
+        col_reg, col_store = st.columns(2)
+
+        with col_reg:
+            st.subheader("Receita por Região")
+            region_sales = df.groupby("region", as_index=False)["net_revenue"].sum().sort_values("net_revenue", ascending=False)
+            fig_reg = px.bar(
+                region_sales, x="region", y="net_revenue",
+                color="region", title="Faturamento por Região",
+                color_discrete_sequence=COLORS,
+            )
+            st.plotly_chart(styled_plotly(fig_reg), use_container_width=True)
+
+        # --- Receita por Loja ---
+        with col_store:
+            st.subheader("Performance por Loja")
+            store_sales = df.groupby("store_name", as_index=False).agg(
+                receita=("net_revenue", "sum"),
+                pedidos=("transaction_id", "count"),
+                margem=("margin_pct", "mean"),
+            ).sort_values("receita", ascending=False)
+            fig_store = px.bar(
+                store_sales, x="store_name", y="receita",
+                color="store_name", title="Receita por Loja",
+                color_discrete_sequence=COLORS,
+            )
+            st.plotly_chart(styled_plotly(fig_store), use_container_width=True)
+
+        # --- Top 10 Produtos ---
+        st.subheader("Top 10 Produtos por Receita")
+        top_products = (
+            df.groupby("product_name", as_index=False)["net_revenue"]
             .sum()
-            .reset_index()
             .sort_values("net_revenue", ascending=False)
+            .head(10)
         )
-
-        fig = px.bar(
-            category_sales,
-            x="category",
-            y="net_revenue",
-            color="category",
-            title="Faturamento por Categoria",
-            color_discrete_sequence=COLORS
+        fig_top = px.bar(
+            top_products, x="net_revenue", y="product_name",
+            orientation="h", title="Ranking de Produtos",
+            color="net_revenue", color_continuous_scale=["#AED6F1", COLOR_PRIMARY],
         )
+        fig_top.update_layout(yaxis=dict(autorange="reversed"))
+        st.plotly_chart(styled_plotly(fig_top, 450), use_container_width=True)
 
-        st.plotly_chart(styled_plotly(fig), use_container_width=True)
+        # --- Impacto de Descontos na Margem ---
+        st.subheader("Impacto de Descontos na Margem")
+        fig_disc = px.scatter(
+            df, x="discount_pct", y="margin_pct",
+            color="category", size="net_revenue",
+            title="Desconto vs. Margem por Categoria",
+            color_discrete_sequence=COLORS,
+            labels={"discount_pct": "% Desconto", "margin_pct": "% Margem"},
+        )
+        st.plotly_chart(styled_plotly(fig_disc), use_container_width=True)
+
+        # --- Insight executivo ---
+        st.info(
+            "💡 **Insight:** Analise quais categorias mantêm margem saudável mesmo com "
+            "descontos elevados — essas são candidatas para campanhas promocionais com "
+            "menor risco de erosão de lucro."
+        )
 
     if menu == "👥 Customer Segmentation":
 
@@ -1415,64 +1482,277 @@ def main() -> None:
 
         df = load_customer_data()
 
-        st.subheader("Distribuição de Clientes")
+        # --- KPIs ---
+        st.subheader("Visão Geral da Base")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total de Clientes", f"{df['customer_id'].nunique()}")
+        col2.metric("Ticket Médio", format_currency(df["avg_order_value"].mean()))
+        col3.metric("Gasto Médio 12m", format_currency(df["total_spent_12m"].mean()))
+        col4.metric("Frequência Média", f"{df['frequency_12m'].mean():.1f} compras")
 
-        fig = px.histogram(
-            df,
-            x="avg_order_value",
-            nbins=30,
-            title="Distribuição do Ticket Médio"
+        st.divider()
+
+        # --- Distribuição de Segmentos (donut) ---
+        col_seg, col_chan = st.columns(2)
+
+        with col_seg:
+            st.subheader("Segmentos de Clientes")
+            seg_counts = df["segment_hint"].value_counts().reset_index()
+            seg_counts.columns = ["Segmento", "Clientes"]
+            fig_seg = px.pie(
+                seg_counts, names="Segmento", values="Clientes",
+                title="Distribuição por Segmento",
+                color_discrete_sequence=COLORS, hole=0.5,
+            )
+            fig_seg.update_traces(textinfo="label+percent", textposition="outside")
+            st.plotly_chart(styled_plotly(fig_seg), use_container_width=True)
+
+        # --- Canal Preferido ---
+        with col_chan:
+            st.subheader("Canal Preferido")
+            chan_counts = df["preferred_channel"].value_counts().reset_index()
+            chan_counts.columns = ["Canal", "Clientes"]
+            fig_chan = px.bar(
+                chan_counts, x="Canal", y="Clientes",
+                color="Canal", title="Clientes por Canal de Compra",
+                color_discrete_sequence=COLORS,
+            )
+            st.plotly_chart(styled_plotly(fig_chan), use_container_width=True)
+
+        # --- Perfil Demográfico ---
+        col_gen, col_city = st.columns(2)
+
+        with col_gen:
+            st.subheader("Perfil por Gênero")
+            gen_data = df.groupby("gender", as_index=False).agg(
+                clientes=("customer_id", "count"),
+                gasto_medio=("total_spent_12m", "mean"),
+            )
+            fig_gen = px.bar(
+                gen_data, x="gender", y="gasto_medio",
+                color="gender", title="Gasto Médio por Gênero",
+                text="clientes", color_discrete_sequence=COLORS,
+                labels={"gasto_medio": "Gasto Médio 12m (R$)", "gender": "Gênero"},
+            )
+            fig_gen.update_traces(texttemplate="%{text} clientes", textposition="outside")
+            st.plotly_chart(styled_plotly(fig_gen), use_container_width=True)
+
+        with col_city:
+            st.subheader("Clientes por Cidade")
+            city_data = df.groupby("city", as_index=False).agg(
+                clientes=("customer_id", "count"),
+                gasto_total=("total_spent_12m", "sum"),
+            ).sort_values("gasto_total", ascending=False)
+            fig_city = px.bar(
+                city_data, x="city", y="gasto_total",
+                color="city", title="Gasto Total por Cidade",
+                text="clientes", color_discrete_sequence=COLORS,
+            )
+            fig_city.update_traces(texttemplate="%{text} clientes", textposition="outside")
+            st.plotly_chart(styled_plotly(fig_city), use_container_width=True)
+
+        # --- Distribuição do Ticket Médio ---
+        st.subheader("Distribuição do Ticket Médio")
+        fig_hist = px.histogram(
+            df, x="avg_order_value", nbins=30,
+            title="Distribuição do Ticket Médio",
+            color_discrete_sequence=[COLOR_SECONDARY],
         )
+        st.plotly_chart(styled_plotly(fig_hist), use_container_width=True)
 
-        st.plotly_chart(styled_plotly(fig), use_container_width=True)
-
-        st.subheader("Valor Estimado do Cliente (LTV)")
-
-        fig2 = px.scatter(
-            df,
-            x="frequency_12m",
-            y="ltv_estimate",
-            color="tenure_months",
-            title="Lifetime Value por Frequência"
+        # --- LTV vs Frequência ---
+        st.subheader("Lifetime Value por Frequência")
+        fig_ltv = px.scatter(
+            df, x="frequency_12m", y="ltv_estimate",
+            color="segment_hint", size="total_spent_12m",
+            title="LTV Estimado vs. Frequência de Compra",
+            color_discrete_sequence=COLORS,
+            labels={"frequency_12m": "Frequência (12m)", "ltv_estimate": "LTV Estimado (R$)"},
         )
+        st.plotly_chart(styled_plotly(fig_ltv), use_container_width=True)
 
-        st.plotly_chart(styled_plotly(fig2), use_container_width=True)
+        # --- Risco de Churn ---
+        st.subheader("Análise de Risco de Churn")
+        df["risco_churn"] = df["recency_days"].apply(
+            lambda x: "🔴 Alto" if x >= 60 else ("🟡 Médio" if x >= 30 else "🟢 Baixo")
+        )
+        churn_dist = df["risco_churn"].value_counts().reset_index()
+        churn_dist.columns = ["Risco", "Clientes"]
+        fig_churn = px.bar(
+            churn_dist, x="Risco", y="Clientes",
+            color="Risco", title="Distribuição de Risco de Churn",
+            color_discrete_map={"🔴 Alto": COLOR_DANGER, "🟡 Médio": COLOR_WARNING, "🟢 Baixo": COLOR_SUCCESS},
+        )
+        st.plotly_chart(styled_plotly(fig_churn), use_container_width=True)
+
+        # --- Insight executivo ---
+        alto_risco = int((df["recency_days"] >= 60).sum())
+        st.warning(
+            f"⚠️ **Atenção:** {alto_risco} clientes estão inativos há mais de 60 dias. "
+            "Recomenda-se uma campanha de reativação segmentada para reduzir o churn."
+        )
 
     if menu == "📈 Business Dashboard":
 
         st.title("📈 Business Performance Dashboard")
 
         kpis = load_kpi_data()
+        channels = load_channel_data()
 
         latest = kpis.iloc[-1]
+        prev = kpis.iloc[-2] if len(kpis) > 1 else None
 
-        col1, col2, col3 = st.columns(3)
-
+        # --- KPIs com delta ---
+        col1, col2, col3, col4 = st.columns(4)
         col1.metric(
-            "Receita",
-            format_currency(latest["revenue"])
+            "Receita", format_currency(float(latest["revenue"])),
+            calculate_delta(float(latest["revenue"]), float(prev["revenue"]) if prev is not None else None),
         )
-
         col2.metric(
-            "Lucro",
-            format_currency(latest["profit"])
+            "Lucro", format_currency(float(latest["profit"])),
+            calculate_delta(float(latest["profit"]), float(prev["profit"]) if prev is not None else None),
         )
-
         col3.metric(
-            "Margem",
-            format_percent(latest["profit_margin"])
+            "Margem", format_percent(float(latest["profit_margin"])),
+        )
+        col4.metric(
+            "NPS", f"{int(latest['nps'])}",
+            calculate_delta(float(latest["nps"]), float(prev["nps"]) if prev is not None else None),
         )
 
         st.divider()
 
-        fig = px.line(
-            kpis,
-            x="month",
-            y="revenue",
-            title="Evolução da Receita"
-        )
+        # --- Gauges: NPS e Churn ---
+        g_col1, g_col2, g_col3 = st.columns(3)
 
-        st.plotly_chart(styled_plotly(fig), use_container_width=True)
+        with g_col1:
+            fig_g1 = go.Figure(go.Indicator(
+                mode="gauge+number", value=float(latest["profit_margin"]) * 100,
+                title={"text": "Margem de Lucro (%)"},
+                gauge=dict(axis=dict(range=[0, 40]), bar=dict(color=COLOR_PRIMARY),
+                    steps=[dict(range=[0, 15], color="#FADBD8"),
+                           dict(range=[15, 25], color="#FEF9E7"),
+                           dict(range=[25, 40], color="#D5F5E3")],
+                    threshold=dict(line=dict(color=COLOR_DANGER, width=3), thickness=0.8, value=20)),
+                number=dict(suffix="%"),
+            ))
+            st.plotly_chart(styled_plotly(fig_g1, 280), use_container_width=True)
+
+        with g_col2:
+            fig_g2 = go.Figure(go.Indicator(
+                mode="gauge+number", value=float(latest["nps"]),
+                title={"text": "NPS"},
+                gauge=dict(axis=dict(range=[0, 100]), bar=dict(color=COLOR_SECONDARY),
+                    steps=[dict(range=[0, 30], color="#FADBD8"),
+                           dict(range=[30, 50], color="#FEF9E7"),
+                           dict(range=[50, 100], color="#D5F5E3")],
+                    threshold=dict(line=dict(color=COLOR_SUCCESS, width=3), thickness=0.8, value=50)),
+            ))
+            st.plotly_chart(styled_plotly(fig_g2, 280), use_container_width=True)
+
+        with g_col3:
+            fig_g3 = go.Figure(go.Indicator(
+                mode="gauge+number", value=float(latest["churn_rate"]) * 100,
+                title={"text": "Churn Rate (%)"},
+                gauge=dict(axis=dict(range=[0, 10]), bar=dict(color=COLOR_WARNING),
+                    steps=[dict(range=[0, 3], color="#D5F5E3"),
+                           dict(range=[3, 5], color="#FEF9E7"),
+                           dict(range=[5, 10], color="#FADBD8")],
+                    threshold=dict(line=dict(color=COLOR_DANGER, width=3), thickness=0.8, value=5)),
+                number=dict(suffix="%"),
+            ))
+            st.plotly_chart(styled_plotly(fig_g3, 280), use_container_width=True)
+
+        # --- Waterfall P&L ---
+        st.subheader("Decomposição de Resultado (último mês)")
+        fig_wf = go.Figure(go.Waterfall(
+            orientation="v", measure=["absolute", "relative", "total"],
+            x=["Receita", "Despesas", "Lucro"],
+            y=[float(latest["revenue"]), -float(latest["expenses"]), float(latest["profit"])],
+            text=[format_currency(float(latest["revenue"])),
+                  format_currency(-float(latest["expenses"])),
+                  format_currency(float(latest["profit"]))],
+            textposition="outside",
+            connector=dict(line=dict(color="#CBD5E0", width=1)),
+            increasing=dict(marker=dict(color=COLOR_SUCCESS)),
+            decreasing=dict(marker=dict(color=COLOR_DANGER)),
+            totals=dict(marker=dict(color=COLOR_PRIMARY)),
+        ))
+        styled_plotly(fig_wf, 380).update_layout(title="Waterfall P&L", showlegend=False)
+        st.plotly_chart(fig_wf, use_container_width=True)
+
+        # --- Tendência Receita & Lucro ---
+        st.subheader("Tendência Receita & Lucro")
+        fig_trend = go.Figure()
+        fig_trend.add_trace(go.Scatter(
+            x=kpis["month_label"], y=kpis["revenue"],
+            fill="tozeroy", fillcolor="rgba(46,134,193,0.15)",
+            line=dict(color=COLOR_SECONDARY, width=3), name="Receita",
+        ))
+        fig_trend.add_trace(go.Scatter(
+            x=kpis["month_label"], y=kpis["profit"],
+            fill="tozeroy", fillcolor="rgba(39,174,96,0.12)",
+            line=dict(color=COLOR_SUCCESS, width=3), name="Lucro",
+        ))
+        styled_plotly(fig_trend, 350).update_layout(title="Receita vs. Lucro Mensal")
+        st.plotly_chart(fig_trend, use_container_width=True)
+
+        # --- Aquisição de Clientes ---
+        st.subheader("Aquisição de Novos Clientes")
+        fig_acq = px.bar(
+            kpis, x="month_label", y="new_customers",
+            title="Novos Clientes por Mês",
+            color_discrete_sequence=[COLOR_SECONDARY],
+            text="new_customers",
+        )
+        fig_acq.update_traces(textposition="outside")
+        st.plotly_chart(styled_plotly(fig_acq, 350), use_container_width=True)
+
+        # --- Performance de Canais ---
+        st.subheader("Performance de Canais de Aquisição")
+        col_ch1, col_ch2 = st.columns(2)
+
+        with col_ch1:
+            chan_rev = channels.groupby("channel", as_index=False)["revenue"].sum().sort_values("revenue", ascending=False)
+            fig_ch_rev = px.bar(
+                chan_rev, x="channel", y="revenue",
+                color="channel", title="Receita por Canal",
+                color_discrete_sequence=COLORS,
+            )
+            st.plotly_chart(styled_plotly(fig_ch_rev), use_container_width=True)
+
+        with col_ch2:
+            chan_conv = channels.groupby("channel", as_index=False).agg(
+                taxa_conversao=("conversion_rate", "mean"),
+                cac_medio=("cac", "mean"),
+            )
+            fig_ch_conv = px.bar(
+                chan_conv, x="channel", y="taxa_conversao",
+                color="channel", title="Taxa de Conversão por Canal",
+                color_discrete_sequence=COLORS,
+                text=chan_conv["taxa_conversao"].apply(lambda x: f"{x*100:.1f}%"),
+            )
+            fig_ch_conv.update_traces(textposition="outside")
+            st.plotly_chart(styled_plotly(fig_ch_conv), use_container_width=True)
+
+        # --- CAC por Canal ---
+        st.subheader("Custo de Aquisição por Canal (CAC)")
+        chan_cac = channels.groupby("channel", as_index=False)["cac"].mean().sort_values("cac", ascending=True)
+        fig_cac = px.bar(
+            chan_cac, x="cac", y="channel", orientation="h",
+            title="CAC Médio por Canal",
+            color="cac", color_continuous_scale=["#D5F5E3", COLOR_DANGER],
+            labels={"cac": "CAC (R$)"},
+        )
+        st.plotly_chart(styled_plotly(fig_cac, 300), use_container_width=True)
+
+        # --- Insight executivo ---
+        best_channel = chan_rev.iloc[0]["channel"]
+        st.success(
+            f"✅ **Insight:** O canal **{best_channel}** lidera em receita. "
+            "Compare o CAC de cada canal para otimizar o investimento de marketing "
+            "e maximizar o ROI de aquisição."
+        )
 
     if menu == "⚙️ ETL Pipeline":
 
@@ -1508,25 +1788,71 @@ def main() -> None:
 
     if menu in ["👤 Sobre", "Sobre"]:
 
-        st.title("Sobre a Autora")
+        st.title("👤 Sobre a Autora")
 
-        st.markdown(
-        """
-        **Sara Oliveira Guimarães Nascimento**
+        col_about, col_links = st.columns([2, 1])
 
-        Analista de Negócios especializada em:
+        with col_about:
+            st.markdown(
+            """
+            **Sara Oliveira Guimarães Nascimento**
 
-        • Análise de dados  
-        • Business Intelligence  
-        • Processos empresariais  
-        • Estratégia baseada em dados  
+            Analista de Negócios especializada em:
 
-        Empresa: **Dalumia Consultoria**
+            • Análise de dados e Business Intelligence  
+            • Modelagem de indicadores e KPIs  
+            • Processos empresariais e melhoria contínua  
+            • Estratégia baseada em dados para tomada de decisão  
 
-        Este portfólio apresenta projetos desenvolvidos para demonstrar
-        aplicações práticas de dados na tomada de decisão empresarial.
-        """
-        )
+            Empresa: **Dalumia Consultoria ME**
+
+            Este portfólio apresenta projetos desenvolvidos para demonstrar
+            aplicações práticas de dados na tomada de decisão empresarial,
+            cobrindo desde a engenharia de dados até dashboards executivos.
+            """
+            )
+
+        with col_links:
+            st.subheader("Links")
+            st.markdown("🔗 [GitHub](https://github.com/saraa452)")
+            st.markdown("💼 [LinkedIn](https://linkedin.com/in/)")
+            st.markdown("📧 Contato profissional disponível via LinkedIn")
+
+        st.divider()
+
+        st.subheader("Competências Demonstradas neste Portfólio")
+
+        comp_col1, comp_col2, comp_col3 = st.columns(3)
+        with comp_col1:
+            st.markdown(
+            """
+            **Análise de Dados**
+            - Python / Pandas
+            - SQL
+            - Estatística descritiva
+            - Segmentação RFM
+            """
+            )
+        with comp_col2:
+            st.markdown(
+            """
+            **Visualização / BI**
+            - Plotly / Streamlit
+            - Dashboards interativos
+            - KPIs e métricas
+            - Storytelling com dados
+            """
+            )
+        with comp_col3:
+            st.markdown(
+            """
+            **Engenharia de Dados**
+            - ETL Pipelines
+            - Governança de dados
+            - Automação de processos
+            - Integração de fontes
+            """
+            )
 
 
 if __name__ == "__main__":
