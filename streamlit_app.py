@@ -1474,6 +1474,27 @@ def main() -> None:
 
         st.plotly_chart(styled_plotly(fig), use_container_width=True)
 
+    if menu == "⚙️ ETL Pipeline":
+
+        st.title("⚙️ Data Engineering Pipeline")
+
+        st.markdown(
+        """
+        Este projeto demonstra um pipeline completo de engenharia de dados.
+
+        Etapas do pipeline:
+
+        1️⃣ Extração de dados  
+        2️⃣ Transformação com Pandas  
+        3️⃣ Integração de múltiplas fontes  
+        4️⃣ Geração de dataset analítico  
+
+        O pipeline gera datasets prontos para análise e dashboards.
+        """
+        )
+
+        st.code(ETL_SCRIPT.read_text(), language="python")
+
 
 if __name__ == "__main__":
     main()
