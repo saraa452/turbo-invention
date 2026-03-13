@@ -4,7 +4,7 @@ Portfólio com 4 projetos de análise de dados, BI e engenharia de dados.
 
 ## Autoria
 
-- **Autora:** Sara Oliveira Guimarães Nasciemnto
+- **Autora:** Sara Oliveira Guimarães Nascimento 
 - **Cargo:** Analista de Negócios
 - **Empresa:** Dalumia Consultoria ME
 
