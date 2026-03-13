@@ -1277,7 +1277,12 @@ def show_articles_page() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Data Analytics Portfolio", layout="wide")
+    st.set_page_config(
+        page_title="Data Analytics Portfolio",
+        page_icon="📊",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
 
     st.title("📊 Data Analytics Portfolio")
 
