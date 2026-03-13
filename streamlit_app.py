@@ -1495,6 +1495,17 @@ def main() -> None:
 
         st.code(ETL_SCRIPT.read_text(), language="python")
 
+    if menu == "📚 Artigos":
+
+        st.title("📚 Artigos Técnicos")
+
+        article = st.selectbox(
+            "Escolha um artigo",
+            list(ARTICLE_FILES.keys())
+        )
+
+        render_html_article(ARTICLE_FILES[article])
+
 
 if __name__ == "__main__":
     main()
