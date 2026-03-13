@@ -1438,6 +1438,42 @@ def main() -> None:
 
         st.plotly_chart(styled_plotly(fig2), use_container_width=True)
 
+    if menu == "📈 Business Dashboard":
+
+        st.title("📈 Business Performance Dashboard")
+
+        kpis = load_kpi_data()
+
+        latest = kpis.iloc[-1]
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric(
+            "Receita",
+            format_currency(latest["revenue"])
+        )
+
+        col2.metric(
+            "Lucro",
+            format_currency(latest["profit"])
+        )
+
+        col3.metric(
+            "Margem",
+            format_percent(latest["profit_margin"])
+        )
+
+        st.divider()
+
+        fig = px.line(
+            kpis,
+            x="month",
+            y="revenue",
+            title="Evolução da Receita"
+        )
+
+        st.plotly_chart(styled_plotly(fig), use_container_width=True)
+
 
 if __name__ == "__main__":
     main()
