@@ -1281,6 +1281,11 @@ def main() -> None:
 
     st.title("📊 Data Analytics Portfolio")
 
+    menu = st.sidebar.selectbox(
+        "Navegação",
+        ["Visão Geral", "Análise de Vendas", "Insights de Negócio", "Sobre o Projeto"],
+    )
+
     st.markdown(
         """
 ### Projeto: Plataforma de Análise de Vendas
