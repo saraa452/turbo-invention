@@ -1,0 +1,16 @@
+customer_id,age,gender,city,tenure_months,recency_days,frequency_12m,avg_order_value,total_spent_12m,preferred_channel,segment_hint
+C1001,29,F,Sao Paulo,18,12,14,180.50,2527.00,online,loyal
+C1002,35,M,Belo Horizonte,24,8,16,210.30,3364.80,online,high_value
+C1003,41,F,Curitiba,10,35,6,140.00,840.00,loja_fisica,potential
+C1004,33,M,Sao Paulo,14,20,9,165.70,1491.30,app,potential
+C1005,27,F,Campinas,8,52,4,120.40,481.60,online,at_risk
+C1006,45,M,Curitiba,30,5,20,230.10,4602.00,loja_fisica,champion
+C1007,38,F,Florianopolis,12,61,3,110.00,330.00,online,at_risk
+C1008,31,F,Sao Paulo,6,40,5,150.00,750.00,app,new_customer
+C1009,52,M,Porto Alegre,20,15,11,175.40,1929.40,loja_fisica,loyal
+C1010,26,F,Belo Horizonte,4,70,2,95.00,190.00,online,new_customer
+C1011,47,M,Curitiba,16,25,8,160.00,1280.00,app,potential
+C1012,34,F,Sao Paulo,9,44,5,145.20,726.00,online,at_risk
+C1013,39,M,Brasilia,7,28,7,190.00,1330.00,app,potential
+C1014,30,F,Recife,5,80,1,88.00,88.00,online,churn_risk
+C1015,43,M,Salvador,22,9,13,205.00,2665.00,loja_fisica,high_value

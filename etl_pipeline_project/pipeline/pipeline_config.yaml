@@ -1,0 +1,12 @@
+pipeline:
+  name: retail_analytics_pipeline
+  schedule: manual
+  source_files:
+    sales: sales_analysis_project/data/sales_transactions.csv
+    customers: customer_segmentation/dataset/customer_behavior.csv
+  outputs:
+    directory: etl_pipeline_project/pipeline/output
+    files:
+      - sales_enriched.csv
+      - monthly_metrics.csv
+      - customer_metrics.csv

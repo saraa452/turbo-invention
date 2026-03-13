@@ -1,0 +1,9 @@
+product_id,product_name,category,cost_price,sale_price
+P001,Smartwatch Fit,Eletronicos,80.00,120.00
+P002,Fone Bluetooth Lite,Eletronicos,55.00,89.90
+P003,Air Fryer Pro,Casa,220.00,350.00
+P004,Cadeira Office Neo,Moveis,95.00,159.00
+P005,Monitor 27 HD,Eletronicos,320.00,499.00
+P006,Mouse Wireless,Informatica,38.00,79.00
+P007,Garrafa Termica 1L,Casa,22.00,45.00
+P008,Impressora Compacta,Informatica,150.00,230.00
