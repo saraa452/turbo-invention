@@ -1277,43 +1277,37 @@ def show_articles_page() -> None:
 
 
 def main() -> None:
-    st.set_page_config(
-        page_title="Data Analytics Portfolio",
-        page_icon="📊",
-        layout="wide",
-        initial_sidebar_state="expanded",
-    )
-    apply_ui_style()
+    st.set_page_config(page_title="Data Analytics Portfolio", layout="wide")
 
-    render_sidebar_profile()
-    st.sidebar.title("Navegação")
-    page = st.sidebar.radio(
-        "Escolha uma seção",
-        [
-            "Início",
-            "Relatório Executivo",
-            "Sales Analysis",
-            "Customer Segmentation",
-            "Business Dashboard",
-            "ETL Pipeline",
-            "Artigos HTML",
-        ],
-    )
+    st.title("📊 Data Analytics Portfolio")
 
-    if page == "Início":
-        show_home_page()
-    elif page == "Relatório Executivo":
-        show_executive_report_page()
-    elif page == "Sales Analysis":
-        show_sales_page()
-    elif page == "Customer Segmentation":
-        show_customer_page()
-    elif page == "Business Dashboard":
-        show_business_dashboard_page()
-    elif page == "ETL Pipeline":
-        show_etl_page()
-    else:
-        show_articles_page()
+    st.markdown(
+        """
+### Projeto: Plataforma de Análise de Vendas
+
+Este projeto demonstra um pipeline completo de análise de dados:
+
+• Extração e tratamento de dados  
+• Análise exploratória  
+• Visualização interativa  
+• Geração de insights de negócio  
+
+### Tecnologias utilizadas
+- Python
+- Pandas
+- SQL
+- Streamlit
+- Plotly
+
+### Objetivo do projeto
+Analisar dados de vendas para identificar:
+
+- Produtos mais vendidos
+- Regiões com maior faturamento
+- Tendências de vendas
+- Oportunidades de crescimento
+"""
+    )
 
 
 if __name__ == "__main__":
