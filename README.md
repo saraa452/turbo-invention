@@ -61,3 +61,4 @@ O app inclui:
 - Criar notebooks exploratórios nas pastas `notebooks/`.
 - Construir dashboard no Power BI em `business_dashboard/powerbi/`.
 - Adicionar métricas avançadas (LTV, cohort, churn por segmento).
+- ## site deploy: https://turbo-invention-qf8awc5rwd8rcwctvgldrp.streamlit.app/
