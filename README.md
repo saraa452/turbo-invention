@@ -60,5 +60,5 @@ O app inclui:
 
 - Criar notebooks exploratórios nas pastas `notebooks/`.
 - Construir dashboard no Power BI em `business_dashboard/powerbi/`.
-- Adicionar métricas avançadas (LTV, cohort, churn por segmento).
+
 
