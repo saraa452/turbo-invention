@@ -42,6 +42,10 @@ CHANNEL_FILE = BASE_DIR / "business_dashboard" / "datasets" / "channel_performan
 ETL_SCRIPT = BASE_DIR / "etl_pipeline_project" / "scripts" / "etl_pipeline.py"
 PIPELINE_CONFIG = BASE_DIR / "etl_pipeline_project" / "pipeline" / "pipeline_config.yaml"
 ETL_OUTPUT_DIR = BASE_DIR / "etl_pipeline_project" / "pipeline" / "output"
+ETL_SALES_ENRICHED = ETL_OUTPUT_DIR / "sales_enriched.csv"
+ETL_MONTHLY_METRICS = ETL_OUTPUT_DIR / "monthly_metrics.csv"
+ETL_CUSTOMER_METRICS = ETL_OUTPUT_DIR / "customer_metrics.csv"
+ETL_DIAGNOSTIC_REPORT = ETL_OUTPUT_DIR / "diagnostic_report.csv"
 
 ARTICLE_FILES = {
     "Sales Analysis": "sales_analysis_article.html",
@@ -144,6 +148,36 @@ def load_channel_data() -> pd.DataFrame:
         channels["revenue"] / channels["estimated_acquisition_cost"].replace(0, pd.NA)
     ).fillna(0.0)
     return channels.sort_values("month")
+
+
+@st.cache_data(show_spinner=False)
+def load_etl_sales_enriched() -> pd.DataFrame | None:
+    if not ETL_SALES_ENRICHED.exists():
+        return None
+    df = pd.read_csv(ETL_SALES_ENRICHED)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    return df
+
+
+@st.cache_data(show_spinner=False)
+def load_etl_monthly_metrics() -> pd.DataFrame | None:
+    if not ETL_MONTHLY_METRICS.exists():
+        return None
+    return pd.read_csv(ETL_MONTHLY_METRICS)
+
+
+@st.cache_data(show_spinner=False)
+def load_etl_customer_metrics() -> pd.DataFrame | None:
+    if not ETL_CUSTOMER_METRICS.exists():
+        return None
+    return pd.read_csv(ETL_CUSTOMER_METRICS)
+
+
+@st.cache_data(show_spinner=False)
+def load_etl_diagnostic() -> pd.DataFrame | None:
+    if not ETL_DIAGNOSTIC_REPORT.exists():
+        return None
+    return pd.read_csv(ETL_DIAGNOSTIC_REPORT)
 
 
 def render_html_article(article_filename: str, height: int = 900) -> None:
@@ -1760,20 +1794,517 @@ def main() -> None:
 
         st.markdown(
         """
-        Este projeto demonstra um pipeline completo de engenharia de dados.
-
-        Etapas do pipeline:
-
-        1️⃣ Extração de dados  
-        2️⃣ Transformação com Pandas  
-        3️⃣ Integração de múltiplas fontes  
-        4️⃣ Geração de dataset analítico  
-
-        O pipeline gera datasets prontos para análise e dashboards.
+        Pipeline completo de engenharia de dados com **extração, limpeza, tratamento,
+        transformação, análise diagnóstica** e geração de datasets analíticos.
         """
         )
 
-        st.code(ETL_SCRIPT.read_text(), language="python")
+        # --- Carregar dados do pipeline ---
+        sales_etl = load_etl_sales_enriched()
+        monthly_etl = load_etl_monthly_metrics()
+        customer_etl = load_etl_customer_metrics()
+        diagnostic_etl = load_etl_diagnostic()
+
+        pipeline_ready = all(d is not None for d in [sales_etl, monthly_etl, customer_etl, diagnostic_etl])
+
+        if not pipeline_ready:
+            st.warning("Os outputs do pipeline ainda não foram gerados. Execute o script ETL primeiro.")
+            st.code(
+                "pip install -r requirements.txt\npython etl_pipeline_project/scripts/etl_pipeline.py",
+                language="bash",
+            )
+            if ETL_SCRIPT.exists():
+                with st.expander("Script ETL"):
+                    st.code(ETL_SCRIPT.read_text(encoding="utf-8"), language="python")
+        else:
+            # --- KPIs do pipeline ---
+            st.subheader("Resumo do Pipeline")
+            kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns(5)
+            kpi_col1.metric("Transações processadas", f"{len(sales_etl):,}")
+            kpi_col2.metric("Clientes mapeados", f"{len(customer_etl):,}")
+            kpi_col3.metric("Meses consolidados", f"{len(monthly_etl)}")
+            kpi_col4.metric("Indicadores diagnósticos", f"{len(diagnostic_etl)}")
+            kpi_col5.metric("Receita líquida total", format_currency(float(sales_etl["net_revenue"].sum())))
+
+            st.divider()
+
+            tab_visao, tab_diag, tab_exec, tab_code = st.tabs([
+                "Visão dos Dados", "Análise Diagnóstica", "Relatório Executivo", "Código & Config"
+            ])
+
+            # ===================================================================
+            # TAB 1 — Visão dos Dados (gráficos dos outputs do pipeline)
+            # ===================================================================
+            with tab_visao:
+                st.subheader("Evolução Mensal")
+                monthly_sorted = monthly_etl.sort_values("month")
+
+                # Receita e transações mensais
+                fig_monthly = go.Figure()
+                fig_monthly.add_trace(go.Bar(
+                    x=monthly_sorted["month"], y=monthly_sorted["net_revenue"],
+                    name="Receita Líquida", marker_color=COLOR_SECONDARY,
+                    text=monthly_sorted["net_revenue"].apply(lambda v: format_currency(v)),
+                    textposition="outside",
+                    hovertemplate="Receita: R$ %{y:,.2f}<extra></extra>",
+                ))
+                fig_monthly.add_trace(go.Scatter(
+                    x=monthly_sorted["month"], y=monthly_sorted["total_transactions"],
+                    name="Transações", yaxis="y2",
+                    line=dict(color=COLOR_WARNING, width=3),
+                    mode="lines+markers", marker=dict(size=10),
+                    hovertemplate="Transações: %{y}<extra></extra>",
+                ))
+                styled_plotly(fig_monthly).update_layout(
+                    title="Receita Líquida & Volume de Transações por Mês",
+                    yaxis=dict(title="Receita (R$)"),
+                    yaxis2=dict(title="Transações", overlaying="y", side="right"),
+                )
+                st.plotly_chart(fig_monthly, use_container_width=True)
+
+                # Clientes ativos e desconto mensal
+                ev_col1, ev_col2 = st.columns(2)
+                with ev_col1:
+                    fig_cust_month = go.Figure()
+                    fig_cust_month.add_trace(go.Bar(
+                        x=monthly_sorted["month"], y=monthly_sorted["active_customers"],
+                        marker_color=COLOR_PRIMARY, name="Clientes Ativos",
+                        text=monthly_sorted["active_customers"].astype(int).astype(str),
+                        textposition="outside",
+                    ))
+                    styled_plotly(fig_cust_month, 350).update_layout(title="Clientes Ativos por Mês")
+                    st.plotly_chart(fig_cust_month, use_container_width=True)
+
+                with ev_col2:
+                    fig_disc_month = go.Figure()
+                    fig_disc_month.add_trace(go.Bar(
+                        x=monthly_sorted["month"], y=monthly_sorted["total_discount"],
+                        marker_color=COLOR_DANGER, name="Descontos",
+                        text=monthly_sorted["total_discount"].apply(lambda v: format_currency(v)),
+                        textposition="outside",
+                    ))
+                    styled_plotly(fig_disc_month, 350).update_layout(title="Total de Descontos por Mês")
+                    st.plotly_chart(fig_disc_month, use_container_width=True)
+
+                # Mix receita bruta vs líquida
+                fig_gross_net = go.Figure()
+                fig_gross_net.add_trace(go.Bar(
+                    x=monthly_sorted["month"], y=monthly_sorted["gross_revenue"],
+                    name="Receita Bruta", marker_color=COLOR_PRIMARY,
+                ))
+                fig_gross_net.add_trace(go.Bar(
+                    x=monthly_sorted["month"], y=monthly_sorted["net_revenue"],
+                    name="Receita Líquida", marker_color=COLOR_SUCCESS,
+                ))
+                styled_plotly(fig_gross_net, 380).update_layout(
+                    title="Receita Bruta vs. Líquida",
+                    barmode="group",
+                )
+                st.plotly_chart(fig_gross_net, use_container_width=True)
+
+                # Distribuição de clientes por completude
+                st.subheader("Qualidade dos Dados de Clientes")
+                if "data_completeness" in customer_etl.columns:
+                    comp_counts = customer_etl["data_completeness"].value_counts()
+                    comp_col1, comp_col2 = st.columns(2)
+                    with comp_col1:
+                        fig_comp = go.Figure(go.Pie(
+                            labels=comp_counts.index, values=comp_counts.values,
+                            hole=0.5, marker_colors=[COLOR_SUCCESS, COLOR_WARNING],
+                            textinfo="label+value+percent", textposition="outside",
+                        ))
+                        styled_plotly(fig_comp, 350).update_layout(
+                            title="Completude dos Dados por Cliente", showlegend=False,
+                        )
+                        st.plotly_chart(fig_comp, use_container_width=True)
+
+                    with comp_col2:
+                        # Top clientes por receita (saída do pipeline)
+                        top_cust = customer_etl.sort_values("monetary", ascending=False).head(10)
+                        fig_top_cust = go.Figure(go.Bar(
+                            y=top_cust["customer_id"], x=top_cust["monetary"],
+                            orientation="h", marker_color=COLOR_SECONDARY,
+                            text=top_cust["monetary"].apply(lambda v: format_currency(v)),
+                            textposition="auto",
+                        ))
+                        styled_plotly(fig_top_cust, 350).update_layout(
+                            title="Top 10 Clientes por Receita (Pipeline)",
+                            xaxis_title="Receita Líquida (R$)",
+                            yaxis=dict(autorange="reversed"),
+                        )
+                        st.plotly_chart(fig_top_cust, use_container_width=True)
+
+                # Tabela de controle de artefatos
+                st.subheader("Controle de Artefatos")
+                quality_rows: list[dict[str, str | int]] = []
+                for label, path in [
+                    ("sales_transactions.csv (fonte)", SALES_FILE),
+                    ("customer_behavior.csv (fonte)", CUSTOMER_FILE),
+                    ("sales_enriched.csv (output)", ETL_SALES_ENRICHED),
+                    ("monthly_metrics.csv (output)", ETL_MONTHLY_METRICS),
+                    ("customer_metrics.csv (output)", ETL_CUSTOMER_METRICS),
+                    ("diagnostic_report.csv (output)", ETL_DIAGNOSTIC_REPORT),
+                ]:
+                    if path.exists():
+                        rows = len(pd.read_csv(path))
+                        quality_rows.append({"dataset": label, "linhas": rows, "status": "✅ disponível"})
+                    else:
+                        quality_rows.append({"dataset": label, "linhas": 0, "status": "⏳ pendente"})
+                st.dataframe(pd.DataFrame(quality_rows), width="stretch", hide_index=True)
+
+            # ===================================================================
+            # TAB 2 — Análise Diagnóstica
+            # ===================================================================
+            with tab_diag:
+                st.subheader("Análise Diagnóstica do Pipeline")
+                st.markdown(
+                    "Indicadores gerados automaticamente pelo pipeline para identificar "
+                    "**causas raiz** e **oportunidades de melhoria**."
+                )
+
+                # Cards com indicadores diagnósticos
+                for _, row in diagnostic_etl.iterrows():
+                    cat = row["categoria"]
+                    # Escolher ícone/cor por categoria
+                    icon_map = {
+                        "Variação Receita MoM": ("📉", COLOR_SECONDARY),
+                        "Impacto de Descontos": ("💰", COLOR_WARNING),
+                        "Concentração de Clientes": ("👥", COLOR_PRIMARY),
+                        "Ticket Médio": ("🎫", COLOR_SUCCESS),
+                        "Atividade de Clientes": ("🔄", COLOR_DANGER),
+                        "Método de Pagamento": ("💳", "#8E44AD"),
+                        "Performance por Loja": ("🏪", "#2C3E50"),
+                    }
+                    icon, color = icon_map.get(cat, ("📊", COLOR_PRIMARY))
+
+                    st.markdown(
+                        f"""
+<div style="border-left: 4px solid {color}; padding: 12px 16px; margin: 10px 0;
+            background: linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
+            border-radius: 0 10px 10px 0;">
+    <strong>{icon} {cat}</strong> — <code>{row['indicador']}</code>: <strong>{row['valor']}</strong><br>
+    <span style="color: #5a6a7e;">{row['diagnostico']}</span>
+</div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                st.divider()
+
+                # Gráficos diagnósticos
+                st.subheader("Visualizações Diagnósticas")
+
+                diag_col1, diag_col2 = st.columns(2)
+
+                with diag_col1:
+                    # Variação MoM
+                    if len(monthly_sorted) >= 2:
+                        mom = monthly_sorted.copy()
+                        mom["revenue_mom_pct"] = mom["net_revenue"].pct_change() * 100
+                        mom = mom.dropna(subset=["revenue_mom_pct"])
+                        colors_mom = [COLOR_SUCCESS if v >= 0 else COLOR_DANGER for v in mom["revenue_mom_pct"]]
+                        fig_mom = go.Figure(go.Bar(
+                            x=mom["month"], y=mom["revenue_mom_pct"],
+                            marker_color=colors_mom,
+                            text=mom["revenue_mom_pct"].apply(lambda v: f"{v:+.1f}%"),
+                            textposition="outside",
+                        ))
+                        styled_plotly(fig_mom, 380).update_layout(
+                            title="Variação de Receita MoM (%)",
+                            yaxis_title="Variação (%)",
+                        )
+                        st.plotly_chart(fig_mom, use_container_width=True)
+
+                with diag_col2:
+                    # Composição receita: desconto vs líquido
+                    total_gross = float(sales_etl["gross_revenue"].sum())
+                    total_net = float(sales_etl["net_revenue"].sum())
+                    total_disc = float(sales_etl["discount_value"].sum())
+                    fig_comp_rev = go.Figure(go.Pie(
+                        labels=["Receita Líquida", "Descontos"],
+                        values=[total_net, total_disc],
+                        hole=0.55,
+                        marker_colors=[COLOR_SUCCESS, COLOR_DANGER],
+                        textinfo="label+percent+value",
+                        textposition="outside",
+                        texttemplate="%{label}<br>%{percent}<br>R$ %{value:,.2f}",
+                    ))
+                    styled_plotly(fig_comp_rev, 380).update_layout(
+                        title="Composição: Receita Líquida vs. Descontos", showlegend=False,
+                    )
+                    st.plotly_chart(fig_comp_rev, use_container_width=True)
+
+                # Concentração de clientes (Pareto)
+                if "monetary" in customer_etl.columns:
+                    cust_sorted = customer_etl.sort_values("monetary", ascending=False).reset_index(drop=True)
+                    cust_sorted["cumulative_pct"] = cust_sorted["monetary"].cumsum() / cust_sorted["monetary"].sum()
+                    cust_sorted["rank"] = range(1, len(cust_sorted) + 1)
+
+                    fig_pareto_cust = go.Figure()
+                    fig_pareto_cust.add_trace(go.Bar(
+                        x=cust_sorted["customer_id"], y=cust_sorted["monetary"],
+                        name="Receita", marker_color=COLOR_SECONDARY,
+                    ))
+                    fig_pareto_cust.add_trace(go.Scatter(
+                        x=cust_sorted["customer_id"], y=cust_sorted["cumulative_pct"] * 100,
+                        name="% Acumulado", yaxis="y2",
+                        line=dict(color=COLOR_DANGER, width=3),
+                        mode="lines+markers",
+                    ))
+                    styled_plotly(fig_pareto_cust, 400).update_layout(
+                        title="Concentração de Receita por Cliente (Pareto)",
+                        yaxis=dict(title="Receita (R$)"),
+                        yaxis2=dict(title="% Acumulado", overlaying="y", side="right", range=[0, 110]),
+                    )
+                    st.plotly_chart(fig_pareto_cust, use_container_width=True)
+
+                # Atividade de clientes
+                diag_col3, diag_col4 = st.columns(2)
+                with diag_col3:
+                    if "recency" in customer_etl.columns:
+                        customer_etl["status_atividade"] = customer_etl["recency"].apply(
+                            lambda x: "Ativo (≤30d)" if x <= 30 else ("Alerta (31-60d)" if x <= 60 else "Inativo (>60d)")
+                        )
+                        status_counts = customer_etl["status_atividade"].value_counts()
+                        color_status = {
+                            "Ativo (≤30d)": COLOR_SUCCESS,
+                            "Alerta (31-60d)": COLOR_WARNING,
+                            "Inativo (>60d)": COLOR_DANGER,
+                        }
+                        fig_status = go.Figure(go.Pie(
+                            labels=status_counts.index, values=status_counts.values,
+                            hole=0.5,
+                            marker_colors=[color_status.get(s, "#BDC3C7") for s in status_counts.index],
+                            textinfo="label+value+percent", textposition="outside",
+                        ))
+                        styled_plotly(fig_status, 380).update_layout(
+                            title="Status de Atividade dos Clientes", showlegend=False,
+                        )
+                        st.plotly_chart(fig_status, use_container_width=True)
+
+                with diag_col4:
+                    # Método de pagamento
+                    if "payment_method" in sales_etl.columns:
+                        pay_dist = sales_etl["payment_method"].value_counts()
+                        fig_pay = go.Figure(go.Bar(
+                            x=pay_dist.index, y=pay_dist.values,
+                            marker_color=COLORS[:len(pay_dist)],
+                            text=pay_dist.values, textposition="outside",
+                        ))
+                        styled_plotly(fig_pay, 380).update_layout(
+                            title="Distribuição de Métodos de Pagamento",
+                            xaxis_title="Método", yaxis_title="Transações",
+                        )
+                        st.plotly_chart(fig_pay, use_container_width=True)
+
+                # Performance por loja
+                if "store_id" in sales_etl.columns:
+                    store_perf = (
+                        sales_etl.groupby("store_id", as_index=False)
+                        .agg(
+                            receita=("net_revenue", "sum"),
+                            transacoes=("transaction_id", "count"),
+                            ticket_medio=("net_revenue", "mean"),
+                        )
+                        .sort_values("receita", ascending=False)
+                    )
+                    fig_store = go.Figure()
+                    fig_store.add_trace(go.Bar(
+                        x=store_perf["store_id"], y=store_perf["receita"],
+                        name="Receita", marker_color=COLOR_SECONDARY,
+                        text=store_perf["receita"].apply(lambda v: format_currency(v)),
+                        textposition="outside",
+                    ))
+                    fig_store.add_trace(go.Scatter(
+                        x=store_perf["store_id"], y=store_perf["ticket_medio"],
+                        name="Ticket Médio", yaxis="y2",
+                        line=dict(color=COLOR_WARNING, width=3),
+                        mode="lines+markers", marker=dict(size=10),
+                    ))
+                    styled_plotly(fig_store, 380).update_layout(
+                        title="Performance por Loja: Receita & Ticket Médio",
+                        yaxis=dict(title="Receita (R$)"),
+                        yaxis2=dict(title="Ticket Médio (R$)", overlaying="y", side="right"),
+                    )
+                    st.plotly_chart(fig_store, use_container_width=True)
+
+            # ===================================================================
+            # TAB 3 — Relatório Executivo
+            # ===================================================================
+            with tab_exec:
+                st.subheader("Relatório Executivo — Pipeline ETL")
+                st.markdown(
+                    "Síntese gerencial dos dados processados pelo pipeline, "
+                    "com **diagnósticos** e **recomendações acionáveis**."
+                )
+
+                # Gauges de saúde do negócio
+                exec_g1, exec_g2, exec_g3 = st.columns(3)
+
+                total_gross = float(sales_etl["gross_revenue"].sum())
+                total_disc = float(sales_etl["discount_value"].sum())
+                discount_pct = (total_disc / total_gross * 100) if total_gross else 0
+
+                inactive_count = 0
+                total_cust = len(customer_etl)
+                if "recency" in customer_etl.columns:
+                    inactive_count = int((customer_etl["recency"] > 60).sum())
+                inactive_pct = (inactive_count / total_cust * 100) if total_cust else 0
+
+                # Concentração top 20%
+                cust_by_rev = customer_etl.sort_values("monetary", ascending=False)
+                top_n = max(1, int(len(cust_by_rev) * 0.2))
+                top_rev = float(cust_by_rev.head(top_n)["monetary"].sum())
+                total_rev = float(cust_by_rev["monetary"].sum())
+                concentration = (top_rev / total_rev * 100) if total_rev else 0
+
+                with exec_g1:
+                    fig_eg1 = go.Figure(go.Indicator(
+                        mode="gauge+number",
+                        value=discount_pct,
+                        title={"text": "Nível de Descontos (%)"},
+                        gauge=dict(
+                            axis=dict(range=[0, 20]),
+                            bar=dict(color=COLOR_WARNING),
+                            steps=[
+                                dict(range=[0, 5], color="#D5F5E3"),
+                                dict(range=[5, 10], color="#FEF9E7"),
+                                dict(range=[10, 20], color="#FADBD8"),
+                            ],
+                            threshold=dict(line=dict(color=COLOR_DANGER, width=3), thickness=0.8, value=10),
+                        ),
+                        number=dict(suffix="%"),
+                    ))
+                    styled_plotly(fig_eg1, 280)
+                    st.plotly_chart(fig_eg1, use_container_width=True)
+
+                with exec_g2:
+                    fig_eg2 = go.Figure(go.Indicator(
+                        mode="gauge+number",
+                        value=inactive_pct,
+                        title={"text": "Inatividade (%)"},
+                        gauge=dict(
+                            axis=dict(range=[0, 50]),
+                            bar=dict(color=COLOR_DANGER),
+                            steps=[
+                                dict(range=[0, 15], color="#D5F5E3"),
+                                dict(range=[15, 30], color="#FEF9E7"),
+                                dict(range=[30, 50], color="#FADBD8"),
+                            ],
+                            threshold=dict(line=dict(color=COLOR_DANGER, width=3), thickness=0.8, value=30),
+                        ),
+                        number=dict(suffix="%"),
+                    ))
+                    styled_plotly(fig_eg2, 280)
+                    st.plotly_chart(fig_eg2, use_container_width=True)
+
+                with exec_g3:
+                    fig_eg3 = go.Figure(go.Indicator(
+                        mode="gauge+number",
+                        value=concentration,
+                        title={"text": "Concentração Top 20% (%)"},
+                        gauge=dict(
+                            axis=dict(range=[0, 100]),
+                            bar=dict(color=COLOR_PRIMARY),
+                            steps=[
+                                dict(range=[0, 40], color="#D5F5E3"),
+                                dict(range=[40, 60], color="#FEF9E7"),
+                                dict(range=[60, 100], color="#FADBD8"),
+                            ],
+                            threshold=dict(line=dict(color=COLOR_WARNING, width=3), thickness=0.8, value=60),
+                        ),
+                        number=dict(suffix="%"),
+                    ))
+                    styled_plotly(fig_eg3, 280)
+                    st.plotly_chart(fig_eg3, use_container_width=True)
+
+                st.divider()
+
+                # Resumo executivo em texto
+                st.subheader("Síntese dos Diagnósticos")
+
+                avg_ticket = float(sales_etl["net_revenue"].mean())
+                best_month = monthly_sorted.sort_values("net_revenue", ascending=False).iloc[0]
+                worst_month = monthly_sorted.sort_values("net_revenue", ascending=True).iloc[0]
+
+                st.markdown(
+                    f"""
+| Indicador | Valor | Avaliação |
+|:---|:---|:---|
+| **Receita líquida total** | {format_currency(float(sales_etl['net_revenue'].sum()))} | Volume consolidado do período |
+| **Ticket médio** | {format_currency(avg_ticket)} | {'Elevado — mix premium' if avg_ticket > 300 else 'Moderado — mix diversificado'} |
+| **Melhor mês** | {best_month['month']} ({format_currency(float(best_month['net_revenue']))}) | Pico de faturamento |
+| **Pior mês** | {worst_month['month']} ({format_currency(float(worst_month['net_revenue']))}) | Menor faturamento |
+| **Nível de descontos** | {discount_pct:.1f}% da receita bruta | {'⚠️ Elevado' if discount_pct > 10 else '✅ Controlado'} |
+| **Clientes inativos (>60d)** | {inactive_count} de {total_cust} ({inactive_pct:.1f}%) | {'⚠️ Atenção' if inactive_pct > 30 else '✅ Controlado'} |
+| **Concentração top 20%** | {concentration:.1f}% da receita | {'⚠️ Alta dependência' if concentration > 60 else '✅ Saudável'} |
+                    """
+                )
+
+                st.divider()
+
+                # Plano de ação
+                st.subheader("Plano de Ação Recomendado")
+                action_plan = pd.DataFrame([
+                    {
+                        "Prioridade": "🔴 Alta",
+                        "Diagnóstico": "Queda de receita MoM",
+                        "Ação": "Investigar causas de redução: sazonalidade, mix de produtos ou perda de clientes",
+                        "Impacto esperado": "Reversão da tendência de queda",
+                    },
+                    {
+                        "Prioridade": "🔴 Alta" if inactive_pct > 30 else "🟡 Média",
+                        "Diagnóstico": f"{inactive_count} clientes inativos",
+                        "Ação": "Campanha de reativação com oferta personalizada por segmento",
+                        "Impacto esperado": "Recuperação de receita recorrente",
+                    },
+                    {
+                        "Prioridade": "🟡 Média",
+                        "Diagnóstico": f"Descontos em {discount_pct:.1f}%",
+                        "Ação": "Revisar política de descontos — limitar a categorias estratégicas",
+                        "Impacto esperado": "Melhoria de margem sem perda relevante de volume",
+                    },
+                    {
+                        "Prioridade": "🟡 Média" if concentration <= 60 else "🔴 Alta",
+                        "Diagnóstico": f"Top 20% = {concentration:.0f}% da receita",
+                        "Ação": "Diversificar base ativa — foco em conversão de clientes potenciais",
+                        "Impacto esperado": "Redução do risco de dependência",
+                    },
+                    {
+                        "Prioridade": "🟢 Contínua",
+                        "Diagnóstico": "Governança de dados",
+                        "Ação": "Automatizar execução do pipeline ETL com agenda recorrente",
+                        "Impacto esperado": "Indicadores sempre atualizados para decisão",
+                    },
+                ])
+                st.dataframe(action_plan, width="stretch", hide_index=True)
+
+                # Tabela completa do diagnóstico
+                with st.expander("Detalhamento completo dos indicadores diagnósticos"):
+                    st.dataframe(diagnostic_etl, width="stretch", hide_index=True)
+
+            # ===================================================================
+            # TAB 4 — Código & Configuração
+            # ===================================================================
+            with tab_code:
+                st.subheader("Execução do Pipeline")
+                st.code(
+                    "pip install -r requirements.txt\npython etl_pipeline_project/scripts/etl_pipeline.py",
+                    language="bash",
+                )
+
+                if PIPELINE_CONFIG.exists():
+                    with st.expander("Configuração do pipeline"):
+                        st.code(PIPELINE_CONFIG.read_text(encoding="utf-8"), language="yaml")
+
+                if ETL_SCRIPT.exists():
+                    with st.expander("Script ETL"):
+                        st.code(ETL_SCRIPT.read_text(encoding="utf-8"), language="python")
+
+                st.markdown("### Artigo do projeto")
+                render_html_article(ARTICLE_FILES["ETL Pipeline"])
+
+        render_author_signature()
 
     if menu == "📚 Artigos":
 
