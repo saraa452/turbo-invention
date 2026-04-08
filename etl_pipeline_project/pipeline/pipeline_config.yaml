@@ -10,3 +10,4 @@ pipeline:
       - sales_enriched.csv
       - monthly_metrics.csv
       - customer_metrics.csv
+      - diagnostic_report.csv
